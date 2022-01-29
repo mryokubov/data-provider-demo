@@ -1,26 +1,18 @@
 package openmrs;
 
-import com.github.javafaker.Faker;
-
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.openqa.selenium.By;
-import org.openqa.selenium.WebDriver;
-import org.testng.annotations.AfterMethod;
-import org.testng.annotations.BeforeMethod;
+import org.openqa.selenium.WebElement;
+import org.openqa.selenium.support.ui.Select;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
-import org.testng.asserts.SoftAssert;
-import utils.BrowserDriver;
 import utils.ConfigReader;
-import utils.StaticValues;
-
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
+import utils.ExcelReader;
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
+import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.util.Calendar;
 import java.util.Map;
 
 /**
@@ -39,11 +31,80 @@ public class PatientRegistrationTests extends BaseTest{
         driver.findElement(By.id("loginButton")).click();
         driver.findElement(By.xpath("//a[contains(@id,'registerPatient')]")).click();
 
-
         driver.findElement(By.name("givenName")).sendKeys( data.get("givenname"));
         driver.findElement(By.name("middleName")).sendKeys(data.get("middlename"));
         driver.findElement(By.name("familyName")).sendKeys(data.get("familyname"));
+        Thread.sleep(1500);
         driver.findElement(By.id("next-button")).click();
+
+        WebElement gender = driver.findElement(By.id("gender-field"));
+        Select select = new Select(gender);
+        select.selectByVisibleText( data.get("gender") );
+
+        Thread.sleep(1500);
+        driver.findElement(By.id("next-button")).click();
+
+        //January 1 1990
+        String birthdate = data.get("birthdate"); //from excel sheet
+        String[] split = birthdate.split(" ");
+        String monthStr = split[0];
+        String day = split[1];
+        String year = split[2];
+
+        if (data.get("dobOrAge").equals("dob")){
+
+            WebElement dobDayInput = driver.findElement(By.name("birthdateDay"));
+            dobDayInput.sendKeys(day);
+
+            WebElement month = driver.findElement(By.id("birthdateMonth-field"));
+            Select select2 = new Select(month);
+            select2.selectByVisibleText( monthStr );
+
+            WebElement dobYearInput = driver.findElement(By.id("birthdateYear-field"));
+            dobYearInput.sendKeys(year);
+        }else if (data.get("dobOrAge").equals("age")){
+            int currentYear = LocalDate.now().getYear();
+            int age = currentYear - Integer.parseInt(year);
+
+            driver.findElement(By.id("birthdateYears-field")).sendKeys(String.valueOf(age));
+            SimpleDateFormat inputFormat = new SimpleDateFormat("MMMM");
+            Calendar cal = Calendar.getInstance();
+            cal.setTime(inputFormat.parse(monthStr));
+            SimpleDateFormat outputFormat = new SimpleDateFormat("MM"); // 01-12
+
+            int estMonths =  Integer.parseInt(outputFormat.format(cal.getTime()));
+            driver.findElement(By.id("birthdateMonths-field")).sendKeys(String.valueOf(estMonths));
+
+        }
+
+        Thread.sleep(1500);
+        driver.findElement(By.id("next-button")).click();
+
+        driver.findElement(By.id("address1")).sendKeys(data.get("address1"));
+        driver.findElement(By.id("address2")).sendKeys(data.get("address2"));
+        driver.findElement(By.id("cityVillage")).sendKeys(data.get("city"));
+        driver.findElement(By.id("stateProvince")).sendKeys(data.get("state"));
+        driver.findElement(By.id("country")).sendKeys(data.get("country"));
+        driver.findElement(By.id("postalCode")).sendKeys(data.get("postalcode"));
+
+
+        Thread.sleep(1500);
+        driver.findElement(By.id("next-button")).click();
+
+        String phonenumber = data.get("phonenumber");
+
+        driver.findElement(By.name("phoneNumber")).sendKeys(phonenumber);
+
+        Thread.sleep(1500);
+        driver.findElement(By.id("next-button")).click();
+
+        WebElement relationship_type = driver.findElement(By.id("relationship_type"));
+        Select select2 = new Select(relationship_type);
+        select2.selectByVisibleText(data.get("relative"));
+        driver.findElement(By.xpath("//input[@placeholder='Person Name']")).sendKeys(data.get("relativename"));
+
+        driver.findElement(By.id("next-button")).click();
+        driver.findElement(By.xpath("//input[@value='Confirm']")).click();
 
 
         softAssert.assertAll();
@@ -52,49 +113,8 @@ public class PatientRegistrationTests extends BaseTest{
 
     @DataProvider(name = "patients")
     public Object[][] getData() throws IOException {
-
-//        Object[][] data = new Object[1000][1];
-//        //                   number of rows 3
-//        for (int i = 0; i < data.length; i++) {
-//
-//            Map<String, String> map = new HashMap<>();
-//
-//            String id = String.valueOf(faker.random().nextInt(1000,9999));
-//            String firstName = faker.name().firstName();
-//            String lastName = faker.name().lastName();
-//            String middle = faker.name().nameWithMiddle();
-//
-//            map.put(id,firstName + " " + middle + " " + lastName);
-//
-//                          //      number of cols in each row
-//            for (int j = 0; j < data[i].length; j++) {
-//                data[i][j] = map;
-//            }
-//        }
-
-        File file = new File(StaticValues.PATIENTS_EXCEL_FILE);
-        FileInputStream fis = new FileInputStream(file);
-
-        XSSFWorkbook workbook = new XSSFWorkbook(fis);
-        XSSFSheet worksheet = workbook.getSheet("newPatients");
-
-        workbook.close();
-
-        int rows = worksheet.getLastRowNum(); //number of total rows
-        int cols = worksheet.getRow(0).getLastCellNum(); //number of total columns
-
-        Object[][] data = new Object[rows][1];
-
-        for (int i = 0; i < rows; i++) {
-            Map<Object, Object> map = new LinkedHashMap<>();
-
-            for (int j = 0; j < cols; j++) {
-
-                map.put(worksheet.getRow(0).getCell(j).toString(), worksheet.getRow(i+1).getCell(j).toString() );
-            }
-            data[i][0] = map;
-        }
-        return data;
+        ExcelReader reader = new ExcelReader("src/main/resources/testData/patients.xlsx", "newPatients");
+        return reader.getData();
     }
 
 }
